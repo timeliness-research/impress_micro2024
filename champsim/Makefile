@@ -4,11 +4,11 @@ CFLAGS := -Wall -O3 -std=gnu99
 CXXFLAGS := -Wall -O3 -std=c++17
 CPPFLAGS :=  -Iinc -MMD -MP
 LDFLAGS := 
-LDLIBS := -L/storage/home/hcoda1/4/asaxena317/p-mqureshi4-0/impress_rowhammer/dramsim3 -ldramsim3
+LDLIBS := -L/home/alan/timeliness/impress_micro2024/dramsim3 -ldramsim3
 
 .phony: all clean
 
-all: bin/MOP_GS8/para_drfm_T4K
+all: bin/timeliness/prefetch/inldnl_nl_no
 
 clean: 
 	$(RM) inc/champsim_constants.h
@@ -25,14 +25,16 @@ clean:
 	 find prefetcher/no -name \*.d -delete
 	 find replacement/lru -name \*.o -delete
 	 find replacement/lru -name \*.d -delete
-	 find prefetcher/no_instr -name \*.o -delete
-	 find prefetcher/no_instr -name \*.d -delete
+	 find prefetcher/next_line_instr -name \*.o -delete
+	 find prefetcher/next_line_instr -name \*.d -delete
+	 find prefetcher/next_line -name \*.o -delete
+	 find prefetcher/next_line -name \*.d -delete
 	 find branch/hashed_perceptron -name \*.o -delete
 	 find branch/hashed_perceptron -name \*.d -delete
 	 find btb/basic_btb -name \*.o -delete
 	 find btb/basic_btb -name \*.d -delete
 
-bin/MOP_GS8/para_drfm_T4K: $(patsubst %.cc,%.o,$(wildcard src/*.cc)) obj/repl_rreplacementDsrrip.a obj/pref_pprefetcherDno.a obj/repl_rreplacementDlru.a obj/pref_pprefetcherDno_instr.a obj/bpred_bbranchDhashed_perceptron.a obj/btb_bbtbDbasic_btb.a
+bin/timeliness/prefetch/inldnl_nl_no: $(patsubst %.cc,%.o,$(wildcard src/*.cc)) obj/repl_rreplacementDsrrip.a obj/pref_pprefetcherDno.a obj/repl_rreplacementDlru.a obj/pref_pprefetcherDnext_line_instr.a obj/pref_pprefetcherDnext_line.a obj/bpred_bbranchDhashed_perceptron.a obj/btb_bbtbDbasic_btb.a
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 replacement/srrip/%.o: CFLAGS += -Ireplacement/srrip
@@ -56,10 +58,17 @@ obj/repl_rreplacementDlru.a: $(patsubst %.cc,%.o,$(wildcard replacement/lru/*.cc
 	@mkdir -p $(dir $@)
 	ar -rcs $@ $^
 
-prefetcher/no_instr/%.o: CFLAGS += -Iprefetcher/no_instr
-prefetcher/no_instr/%.o: CXXFLAGS += -Iprefetcher/no_instr
-prefetcher/no_instr/%.o: CXXFLAGS +=  -Dprefetcher_initialize=pref_pprefetcherDno_instr_initialize -Dprefetcher_branch_operate=pref_pprefetcherDno_instr_branch_operate -Dprefetcher_cache_operate=pref_pprefetcherDno_instr_cache_operate -Dprefetcher_cycle_operate=pref_pprefetcherDno_instr_cycle_operate -Dprefetcher_cache_fill=pref_pprefetcherDno_instr_cache_fill -Dprefetcher_final_stats=pref_pprefetcherDno_instr_final_stats -Dl1i_prefetcher_initialize=pref_pprefetcherDno_instr_initialize -Dl1i_prefetcher_branch_operate=pref_pprefetcherDno_instr_branch_operate -Dl1i_prefetcher_cache_operate=pref_pprefetcherDno_instr_cache_operate -Dl1i_prefetcher_cycle_operate=pref_pprefetcherDno_instr_cycle_operate -Dl1i_prefetcher_cache_fill=pref_pprefetcherDno_instr_cache_fill -Dl1i_prefetcher_final_stats=pref_pprefetcherDno_instr_final_stats
-obj/pref_pprefetcherDno_instr.a: $(patsubst %.cc,%.o,$(wildcard prefetcher/no_instr/*.cc)) $(patsubst %.c,%.o,$(wildcard prefetcher/no_instr/*.c))
+prefetcher/next_line_instr/%.o: CFLAGS += -Iprefetcher/next_line_instr
+prefetcher/next_line_instr/%.o: CXXFLAGS += -Iprefetcher/next_line_instr
+prefetcher/next_line_instr/%.o: CXXFLAGS +=  -Dprefetcher_initialize=pref_pprefetcherDnext_line_instr_initialize -Dprefetcher_branch_operate=pref_pprefetcherDnext_line_instr_branch_operate -Dprefetcher_cache_operate=pref_pprefetcherDnext_line_instr_cache_operate -Dprefetcher_cycle_operate=pref_pprefetcherDnext_line_instr_cycle_operate -Dprefetcher_cache_fill=pref_pprefetcherDnext_line_instr_cache_fill -Dprefetcher_final_stats=pref_pprefetcherDnext_line_instr_final_stats -Dl1i_prefetcher_initialize=pref_pprefetcherDnext_line_instr_initialize -Dl1i_prefetcher_branch_operate=pref_pprefetcherDnext_line_instr_branch_operate -Dl1i_prefetcher_cache_operate=pref_pprefetcherDnext_line_instr_cache_operate -Dl1i_prefetcher_cycle_operate=pref_pprefetcherDnext_line_instr_cycle_operate -Dl1i_prefetcher_cache_fill=pref_pprefetcherDnext_line_instr_cache_fill -Dl1i_prefetcher_final_stats=pref_pprefetcherDnext_line_instr_final_stats
+obj/pref_pprefetcherDnext_line_instr.a: $(patsubst %.cc,%.o,$(wildcard prefetcher/next_line_instr/*.cc)) $(patsubst %.c,%.o,$(wildcard prefetcher/next_line_instr/*.c))
+	@mkdir -p $(dir $@)
+	ar -rcs $@ $^
+
+prefetcher/next_line/%.o: CFLAGS += -Iprefetcher/next_line
+prefetcher/next_line/%.o: CXXFLAGS += -Iprefetcher/next_line
+prefetcher/next_line/%.o: CXXFLAGS +=  -Dprefetcher_initialize=pref_pprefetcherDnext_line_initialize -Dprefetcher_cache_operate=pref_pprefetcherDnext_line_cache_operate -Dprefetcher_cache_fill=pref_pprefetcherDnext_line_cache_fill -Dprefetcher_cycle_operate=pref_pprefetcherDnext_line_cycle_operate -Dprefetcher_final_stats=pref_pprefetcherDnext_line_final_stats -Dl1d_prefetcher_initialize=pref_pprefetcherDnext_line_initialize -Dl2c_prefetcher_initialize=pref_pprefetcherDnext_line_initialize -Dllc_prefetcher_initialize=pref_pprefetcherDnext_line_initialize -Dl1d_prefetcher_operate=pref_pprefetcherDnext_line_cache_operate -Dl2c_prefetcher_operate=pref_pprefetcherDnext_line_cache_operate -Dllc_prefetcher_operate=pref_pprefetcherDnext_line_cache_operate -Dl1d_prefetcher_cache_fill=pref_pprefetcherDnext_line_cache_fill -Dl2c_prefetcher_cache_fill=pref_pprefetcherDnext_line_cache_fill -Dllc_prefetcher_cache_fill=pref_pprefetcherDnext_line_cache_fill -Dl1d_prefetcher_final_stats=pref_pprefetcherDnext_line_final_stats -Dl2c_prefetcher_final_stats=pref_pprefetcherDnext_line_final_stats -Dllc_prefetcher_final_stats=pref_pprefetcherDnext_line_final_stats
+obj/pref_pprefetcherDnext_line.a: $(patsubst %.cc,%.o,$(wildcard prefetcher/next_line/*.cc)) $(patsubst %.c,%.o,$(wildcard prefetcher/next_line/*.c))
 	@mkdir -p $(dir $@)
 	ar -rcs $@ $^
 
@@ -81,7 +90,8 @@ obj/btb_bbtbDbasic_btb.a: $(patsubst %.cc,%.o,$(wildcard btb/basic_btb/*.cc)) $(
 -include $(wildcard replacement/srrip/*.d)
 -include $(wildcard prefetcher/no/*.d)
 -include $(wildcard replacement/lru/*.d)
--include $(wildcard prefetcher/no_instr/*.d)
+-include $(wildcard prefetcher/next_line_instr/*.d)
+-include $(wildcard prefetcher/next_line/*.d)
 -include $(wildcard branch/hashed_perceptron/*.d)
 -include $(wildcard btb/basic_btb/*.d)
 

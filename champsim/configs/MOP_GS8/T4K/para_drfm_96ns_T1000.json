@@ -233,7 +233,7 @@
     },
 
     "physical_memory": {
-        "dramsim3_config": "/storage/home/hcoda1/4/asaxena317/p-mqureshi4-0/impress_rowhammer/champsim/dramsim3_configs/DDR5_64GB_4ch_4800/mop_gs8/exPRE_96ns_drfm.ini",
+        "dramsim3_config": "/home/alan/timeliness/impress_micro2024/champsim/dramsim3_configs/DDR5_64GB_4ch_4800/mop_gs8/exPRE_96ns_drfm.ini",
         "frequency": 2400,
         "channels": 4,
         "ranks": 1,

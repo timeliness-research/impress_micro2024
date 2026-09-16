@@ -186,6 +186,20 @@ void Controller::ClockTick() {
     clk_++;
     cmd_queue_.ClockTick();
     simple_stats_.Increment("num_cycles");
+
+    simple_stats_.AddValue("cmd_queue_occupancy", cmd_queue_.QueueUsage());
+    if (is_unified_queue_) {
+        simple_stats_.AddValue("trans_queue_occupancy", unified_queue_.size());
+    } else {
+        simple_stats_.AddValue("read_queue_occupancy", read_queue_.size());
+        simple_stats_.AddValue("write_buffer_occupancy", write_buffer_.size());
+    }
+
+    simple_stats_.AddValue("pending_read_queue_occupancy", pending_rd_q_.size());
+    simple_stats_.AddValue("pending_write_queue_occupancy", pending_wr_q_.size());
+    simple_stats_.AddValue("return_queue_occupancy", return_queue_.size());
+    simple_stats_.AddValue("act_queue_occupancy", act_queue_.size());
+
     return;
 }
 

@@ -74,6 +74,38 @@ SimpleStats::SimpleStats(const Config& config, int channel_id)
     InitHistoStat("interarrival_latency",
                   "Request interarrival latency (cycles)", 0, 250, 50);
 
+    // Queue Occupancies
+    InitHistoStat("cmd_queue_occupancy", 
+        "Command Queue Occupancy (cycles for each occupancy level)",
+        0, config_.cmd_queue_size, config_.cmd_queue_size);
+
+    if (config_.unified_queue) {
+        InitHistoStat("trans_queue_occupancy", 
+            "Transaction Queue Occupancy (cycles for each occupancy level)",
+            0, config_.trans_queue_size, config_.trans_queue_size);
+    } else {
+        InitHistoStat("read_queue_occupancy", 
+            "Read Queue Occupancy (cycles for each occupancy level)",
+            0, config_.trans_queue_size, config_.trans_queue_size);
+        InitHistoStat("write_buffer_occupancy",
+            "Write Buffer Occupancy (cycles for each occupancy level)",
+            0, config_.trans_queue_size, config_.trans_queue_size);
+    }
+
+    InitHistoStat("pending_read_queue_occupancy",
+        "Pending Read Queue Occupancy (cycles for each occupancy level)",
+        0, config_.trans_queue_size, config_.trans_queue_size);
+    InitHistoStat("pending_write_queue_occupancy",
+        "Pending Write Queue Occupancy (cycles for each occupancy level)",
+        0, config_.trans_queue_size, config_.trans_queue_size);
+
+    InitHistoStat("return_queue_occupancy",
+        "Return Queue Occupancy (cycles for each occupancy level)",
+        0, config_.trans_queue_size, config_.trans_queue_size);
+    InitHistoStat("act_queue_occupancy",
+        "Activate Queue Occupancy (cycles for each occupancy level)",
+        0, config_.trans_queue_size, config_.trans_queue_size);
+
     // some irregular stats
     InitStat("average_bandwidth", "calculated", "Average bandwidth (Bytes/ns)");
     InitStat("total_energy", "calculated", "Total energy (pJ)");

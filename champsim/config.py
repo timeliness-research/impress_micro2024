@@ -746,6 +746,7 @@ with open(constants_header_name, 'wt') as wfp:
         wfp.write("#define IP_ENABLE 1\n")
     else:
         wfp.write("#define IP_ENABLE 0\n")
+    wfp.write("#define CORE_SCALING " + str(config_file.get('core_scaling', 12)) + "\n")
     wfp.write("#define MOP_GANG_SIZE " + str(config_file.get('MOP_GANG_SIZE', 0)) + "\n")
     wfp.write("#define IMPRESS_ALPHA " + str(config_file.get('IMPRESS_ALPHA', 0)) + "\n")
     wfp.write("#define HYDRA_ROW_GROUP_SIZE  " + str(config_file.get('HYDRA_ROW_GROUP_SIZE', 16)) + "\n")

@@ -7,6 +7,8 @@
 #include "dramsim3.h"
 #include "util.h"
 
+#define PMD_SIZE (PAGE_SIZE * 512)
+
 namespace dramsim3 {
     class MemorySystem;
 };
@@ -63,6 +65,26 @@ public:
             procPageAccess = new bool[numPPages]{false};
         }
 
+
+    // change pmd_num to arbitrary pmd_num (pseudo-randomly with scaling as seed)
+    uint64_t scaled_address(uint64_t address, int scaling) {
+        uint64_t pmd_num = address / PMD_SIZE;
+        uint64_t pmd_offset = address % PMD_SIZE;
+        uint64_t NUM_PMDS = DRAM_CHANNELS * DRAM_RANKS * DRAM_BANKS 
+                * DRAM_ROWS * DRAM_COLUMNS * BLOCK_SIZE / PMD_SIZE;
+
+        // Mix pmd_num with scaling as a seed.
+        uint64_t x = pmd_num + scaling * 0x9e3779b97f4a7c15ULL;
+
+        x ^= x >> 30;
+        x *= 0xbf58476d1ce4e5b9ULL;
+        x ^= x >> 27;
+        x *= 0x94d049bb133111ebULL;
+        x ^= x >> 31;
+        pmd_num = x % NUM_PMDS;
+
+        return pmd_num * PMD_SIZE + pmd_offset;
+    }
 
     int add_rq(PACKET* packet) override {
         if (all_warmup_complete <= NUM_CPUS) {
@@ -145,6 +167,14 @@ public:
         // Call to DRAMSim
         memory_system_->AddTransaction(packet->address, false, (packet->type == RH_MITIGATION));
 
+        // add scaled packets
+        for (int scaling = 1; scaling < CORE_SCALING; scaling++) {
+            uint64_t scaled_addr = scaled_address(packet->address, scaling);
+            if (!memory_system_->WillAcceptTransaction(scaled_addr, false))
+                break;
+            memory_system_->AddTransaction(scaled_addr, false, (packet->type == RH_MITIGATION));
+        }
+
         // Add to RQ
         // Remember this packet to later return data
         // *rq_it = *packet;
@@ -193,6 +223,15 @@ public:
         }
         // Call to DRAMSim
         memory_system_->AddTransaction(packet->address, true, (packet->type == RH_MITIGATION));
+
+        // add scaled packets
+        for (int scaling = 1; scaling < CORE_SCALING; scaling++) {
+            uint64_t scaled_addr = scaled_address(packet->address, scaling);
+            if (!memory_system_->WillAcceptTransaction(scaled_addr, true))
+                break;
+            memory_system_->AddTransaction(scaled_addr, true, (packet->type == RH_MITIGATION));
+        }
+
         return 0;
     }
 

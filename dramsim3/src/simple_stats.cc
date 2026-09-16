@@ -22,7 +22,7 @@ SimpleStats::SimpleStats(const Config& config, int channel_id)
     InitStat("num_cycles", "counter", "Number of DRAM cycles");
     InitStat("epoch_num", "counter", "Number of epochs");
     InitStat("num_reads_done", "counter", "Number of read requests issued");
-    InitStat("num_writes_done", "counter", "Number of read requests issued");
+    InitStat("num_writes_done", "counter", "Number of write requests issued");
     InitStat("num_write_buf_hits", "counter", "Number of write buffer hits");
     InitStat("num_read_row_hits", "counter", "Number of read row buffer hits");
     InitStat("num_write_row_hits", "counter",
@@ -75,7 +75,7 @@ SimpleStats::SimpleStats(const Config& config, int channel_id)
                   "Request interarrival latency (cycles)", 0, 250, 50);
 
     // some irregular stats
-    InitStat("average_bandwidth", "calculated", "Average bandwidth");
+    InitStat("average_bandwidth", "calculated", "Average bandwidth (Bytes/ns)");
     InitStat("total_energy", "calculated", "Total energy (pJ)");
     InitStat("average_power", "calculated", "Average power (mW)");
     InitStat("average_read_latency", "calculated",
@@ -464,8 +464,8 @@ void SimpleStats::UpdateFinalStats() {
     // calculated stats
     uint64_t total_reqs =
         counters_["num_reads_done"] + counters_["num_writes_done"];
-    double total_time = counters_["num_cycles"] * config_.tCK;
-    double avg_bw = total_reqs * config_.request_size_bytes / total_time;
+    double total_time = counters_["num_cycles"] * config_.tCK;     // total simulation time in nanoseconds
+    double avg_bw = total_reqs * config_.request_size_bytes / total_time;  // Bytes per ns
     calculated_["average_bandwidth"] = avg_bw;
 
     double total_energy = doubles_["act_energy"] + doubles_["read_energy"] +

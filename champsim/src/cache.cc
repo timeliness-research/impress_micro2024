@@ -33,6 +33,17 @@ extern VirtualMemory vmem;
 extern uint8_t warmup_complete[NUM_CPUS];
 extern uint8_t all_warmup_complete;
 
+void CACHE::increment_pf_latency_counter(uint32_t cpu, uint32_t latency, bool early)
+{
+  uint32_t bin = latency / LATENCY_BIN_WIDTH;
+  if (bin > NUM_LATENCY_BINS)
+    bin = NUM_LATENCY_BINS;
+  if (early)
+    pf_early_latency_counter[cpu][bin]++;
+  else
+    pf_late_latency_counter[cpu][bin]++;
+}
+
 void CACHE::handle_fill()
 {
   while (writes_available_this_cycle > 0) {
@@ -216,14 +227,17 @@ void CACHE::readlike_hit(std::size_t set, std::size_t way, PACKET& handle_pkt)
   sim_hit[handle_pkt.cpu][handle_pkt.type]++;
   sim_access[handle_pkt.cpu][handle_pkt.type]++;
 
-  for (auto ret : handle_pkt.to_return)
-    ret->return_data(&handle_pkt);
-
   // update prefetch stats and reset prefetch bit
   if (hit_block.prefetch) {
     pf_useful++;
+    pf_useful_early++;
+    uint64_t pf_latency = current_cycle - hit_block.cycle_filled;
+    increment_pf_latency_counter(handle_pkt.cpu, pf_latency, true);
     hit_block.prefetch = 0;
   }
+
+  for (auto ret : handle_pkt.to_return)
+    ret->return_data(&handle_pkt);
 }
 
 bool CACHE::readlike_miss(PACKET& handle_pkt)
@@ -253,14 +267,27 @@ bool CACHE::readlike_miss(PACKET& handle_pkt)
 
     if (mshr_entry->type == PREFETCH && handle_pkt.type != PREFETCH) {
       // Mark the prefetch as useful
-      if (mshr_entry->pf_origin_level == fill_level)
+      if (mshr_entry->pf_origin_level == fill_level && mshr_entry->cycle_pf_used == 0) {
         pf_useful++;
+        pf_useful_late++;
+
+        /* Late latency = cycle when miss is returned - current_cycle
+         * below is incorrect therefore commented out
+         */
+        // pf_latency = current_cycle - mshr_entry->cycle_enqueued;
+        // increment_pf_latency_counter(handle_pkt.cpu, pf_latency, false);
+
+        mshr_entry->cycle_pf_used = current_cycle;
+      }
 
       uint64_t prior_event_cycle = mshr_entry->event_cycle;
+      uint64_t prior_cycle_pf_used = mshr_entry->cycle_pf_used;
+
       *mshr_entry = handle_pkt;
 
-      // in case request is already returned, we should keep event_cycle
+      // in case request is already returned, we should keep event_cycle and cycle_pf_used
       mshr_entry->event_cycle = prior_event_cycle;
+      mshr_entry->cycle_pf_used = prior_cycle_pf_used;
     }
   } else {
     if (mshr_full)  // not enough MSHR resource
@@ -397,6 +424,7 @@ bool CACHE::filllike_miss(std::size_t set, std::size_t way, PACKET& handle_pkt)
     fill_block.ip = handle_pkt.ip;
     fill_block.cpu = handle_pkt.cpu;
     fill_block.instr_id = handle_pkt.instr_id;
+    fill_block.cycle_filled = current_cycle;
   }
 
   if (warmup_complete[handle_pkt.cpu] && (handle_pkt.cycle_enqueued != 0))
@@ -1226,6 +1254,12 @@ void CACHE::return_data(PACKET* packet)
   mshr_entry->data = packet->data;
   mshr_entry->pf_metadata = packet->pf_metadata;
   mshr_entry->event_cycle = current_cycle + (warmup_complete[cpu] ? FILL_LATENCY : 0);
+
+  if (mshr_entry->cycle_pf_used != 0) {
+    uint64_t pf_late_latency = current_cycle - mshr_entry->cycle_pf_used;
+    mshr_entry->cycle_pf_used = 0;
+    increment_pf_latency_counter(mshr_entry->cpu, pf_late_latency, false);
+  }
 
   if (NAME == "LLC" && BLOCKHAMMER && all_warmup_complete > NUM_CPUS) {
     uint64_t delay = 0;

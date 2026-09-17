@@ -35,6 +35,9 @@
 // virtual address space prefetching
 #define VA_PREFETCH_TRANSLATION_LATENCY 2
 
+#define NUM_LATENCY_BINS 250
+#define LATENCY_BIN_WIDTH 5
+
 extern std::array<O3_CPU*, NUM_CPUS> ooo_cpu;
 
 class CACHE : public champsim::operable, public MemoryRequestConsumer, public MemoryRequestProducer
@@ -97,6 +100,11 @@ public:
 
   // prefetch stats
   uint64_t pf_requested = 0, pf_issued = 0, pf_useful = 0, pf_useless = 0, pf_fill = 0;
+  uint64_t pf_useful_early = 0, pf_useful_late = 0;
+
+  // prefetch timeliness counters
+  uint64_t pf_early_latency_counter[NUM_CPUS][NUM_LATENCY_BINS+1];
+  uint64_t pf_late_latency_counter[NUM_CPUS][NUM_LATENCY_BINS+1];
 
   // queues
   champsim::delay_queue<PACKET> RQ{RQ_SIZE, HIT_LATENCY}, // read queue
@@ -182,6 +190,8 @@ public:
 
   const repl_t repl_type;
   const pref_t pref_type;
+
+  void increment_pf_latency_counter(uint32_t cpu, uint32_t latency, bool early);
 
   // constructor
   CACHE(std::string v1, double freq_scale, unsigned fill_level, uint32_t v2, int v3, uint32_t v5, uint32_t v6, uint32_t v7, uint32_t v8, uint32_t hit_lat,

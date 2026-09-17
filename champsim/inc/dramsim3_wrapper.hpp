@@ -279,8 +279,9 @@ public:
             *rq_pkt = {};
         }
         else {
-            std::cout << "[PANIC] RQ packet not found on DRAMSim req completion for addr " 
-                      << addr << ". Skipping callback to LLC..." << std::endl;
+            // scaled packets will raise this panic - simply ignore for now.
+            // std::cout << "[PANIC] RQ packet not found on DRAMSim req completion for addr " 
+            //           << addr << ". Skipping callback to LLC..." << std::endl;
             // assert(0);
         }
     }

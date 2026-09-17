@@ -111,7 +111,9 @@ void print_roi_stats(uint32_t cpu, CACHE* cache)
 
     cout << cache->NAME;
     cout << " PREFETCH  REQUESTED: " << setw(10) << cache->pf_requested << "  ISSUED: " << setw(10) << cache->pf_issued;
-    cout << "  USEFUL: " << setw(10) << cache->pf_useful << "  USELESS: " << setw(10) << cache->pf_useless << endl;
+    cout << "  USEFUL: " << setw(10) << cache->pf_useful << "  USELESS: " << setw(10) << cache->pf_useless;
+    cout << "  EARLY: " << setw(10) << cache->pf_useful_early << "  LATE: " << setw(10) << cache->pf_useful_late << endl;
+
 
     cout << cache->NAME;
     cout << " AVERAGE MISS LATENCY: " << (1.0 * (cache->total_miss_latency)) / TOTAL_MISS << " cycles" << endl;
@@ -159,65 +161,84 @@ void print_roi_stats(uint32_t cpu, CACHE* cache)
       avg_ways_used /= (cache->NUM_SET);
     }
 
-    cout << std::endl << "ROWHAMMER_DEFENSE_STATS" << std::endl;
-    cout << "LLC_RH_RESETS " << cache->s_resets << std::endl;
-    cout << "LLC_RH_UNIQ_ROWS_TOUCHED " << cache->s_uniq_rows_touched << std::endl;
-    cout << "LLC_RH_AVG_WAYS_USED " << avg_ways_used << std::endl;
-    for (int i = 1; i < 4; i++) {
-      cout << "LLC_RH_TOT_SETS_IN_STATE_" << i << " " << cache->s_sets_in_state[i]<< std::endl;
-      cout << "LLC_RH_AVG_SETS_IN_STATE_" << i << " " << avg_sets_in_state[i] << std::endl;
-      cout << "LLC_RH_CUR_SETS_IN_STATE_" << i << " " << cache->sets_in_state[i] << std::endl;
-    }
-    cout << "LLC_RH_TOT_UNIQ_ROWS " << cache->s_uniq_rows_ACT << std::endl;
-    cout << "LLC_RH_AVG_UNIQ_ROWS " << avg_uniq_rows << std::endl;
-    cout << "LLC_RH_CUR_UNIQ_ROWS " << cache->uniq_rows_ACT << std::endl;
-    cout << "LLC_RH_TOT_NUM_ACT " << cache->s_num_ACT << std::endl;
-    cout << "LLC_RH_AVG_NUM_ACT " << avg_num_act << std::endl;
-    cout << "LLC_RH_CUR_NUM_ACT " << cache->num_ACT << std::endl;
-    cout << "LLC_RH_TOT_NUM_MIT " << cache->s_num_mits << std::endl;
-    cout << "LLC_RH_AVG_NUM_MIT " << avg_num_mits << std::endl;
-    cout << "LLC_RH_CUR_NUM_MIT " << cache->num_mits << std::endl;
-    cout << "LLC_RH_MM_SET_EVICTS " << cache->s_mm_set_evicts << std::endl;
-    cout << "LLC_RH_MM_SET_MISSES " << cache->s_mm_set_misses << std::endl;
-    cout << std::endl;
-    for (int i = 0; i < 100; i++) {
-      cout << "LLC_RH_TOT_ROW_ACT_HIST_" << i*10+1 << " " << cache->s_row_ACT[i] << std::endl;
-    }
-    cout << std::endl;
-    if (cache->s_resets > 0) {
-      for (int i = 0; i < 100; i++) {
-        cout << "LLC_RH_AVG_ROW_ACT_HIST_" << i*10+1 << " " 
-              << (cache->s_row_ACT[i] - cache->row_ACT[i])/(cache->s_resets) << std::endl;
-      }
-    }
-    cout << std::endl;
-    for (int i = 0; i < 100; i++) {
-      cout << "LLC_RH_CUR_ROW_ACT_HIST_" << i*10+1 << " " << cache->row_ACT[i] << std::endl;
-    }
-    cout << std::endl;
-    cout << "LLC_EARLY_WRITEBACKS " << cache->s_early_writebacks << std::endl;
-    cout << "LLC_CTR_WAY_DATA_WB " << cache->s_ctr_way_data_wb << std::endl;
-    cout << "VMEM_PROC_PPAGES " << vmem.s_proc_ppages_used << std::endl;
-    cout << "VMEM_PT_PPAGES " << vmem.s_pt_ppages_used << std::endl;
-    cout << "DRAM_PPAGES_TOUCHED " 
-         << std::count(DRAM.procPageAccess, DRAM.procPageAccess + DRAM.numPPages, true) << std::endl;
-    cout << "DRAM_ACTS_OCC " << DRAM.ACTs.size() << std::endl;
-    cout << "DRAM_RHACTIONS_OCC " << DRAM.rhActions.size() << std::endl;
-    cout << std::endl << std::endl;
-    cout << "RH_BH_NUM_DELAY " << cache->s_BH_num_delay << std::endl;
-    cout << "RH_BH_SUM_DEAY " << cache->s_BH_sum_delay << std::endl;
-    cout << "RH_BH_MAX_DELAY " << cache->s_BH_max_delay << std::endl;
-    cout << "RH_MG_ID_RP_ACTS " << cache->s_mg_id_rp_acts << std::endl;
-    cout << "RH_MG_IP_RP_ACTS " << cache->s_mg_ip_rp_acts << std::endl;
-    cout << "RH_MG_ACTS " << cache->s_mg_acts << std::endl;
-    cout << "RH_MG_MITS " << cache->s_mg_mits << std::endl;
-    cout << "RH_PARA_ACTS " << cache->s_para_acts << std::endl;
-    cout << "RH_PARA_MITS " << cache->s_para_mits << std::endl;
-    cout << "RH_PARA_NUM_EACTS " << cache->s_para_num_eacts << std::endl;
-    cout << "RH_PARA_SUM_EACTS " << cache->s_para_sum_eacts << std::endl;
-    if (HYDRA_ENABLE || GRAPHENE_ENABLE)
-      cache->lower_level->detector->print_stats();
+    // cout << std::endl << "ROWHAMMER_DEFENSE_STATS" << std::endl;
+    // cout << "LLC_RH_RESETS " << cache->s_resets << std::endl;
+    // cout << "LLC_RH_UNIQ_ROWS_TOUCHED " << cache->s_uniq_rows_touched << std::endl;
+    // cout << "LLC_RH_AVG_WAYS_USED " << avg_ways_used << std::endl;
+    // for (int i = 1; i < 4; i++) {
+    //   cout << "LLC_RH_TOT_SETS_IN_STATE_" << i << " " << cache->s_sets_in_state[i]<< std::endl;
+    //   cout << "LLC_RH_AVG_SETS_IN_STATE_" << i << " " << avg_sets_in_state[i] << std::endl;
+    //   cout << "LLC_RH_CUR_SETS_IN_STATE_" << i << " " << cache->sets_in_state[i] << std::endl;
+    // }
+    // cout << "LLC_RH_TOT_UNIQ_ROWS " << cache->s_uniq_rows_ACT << std::endl;
+    // cout << "LLC_RH_AVG_UNIQ_ROWS " << avg_uniq_rows << std::endl;
+    // cout << "LLC_RH_CUR_UNIQ_ROWS " << cache->uniq_rows_ACT << std::endl;
+    // cout << "LLC_RH_TOT_NUM_ACT " << cache->s_num_ACT << std::endl;
+    // cout << "LLC_RH_AVG_NUM_ACT " << avg_num_act << std::endl;
+    // cout << "LLC_RH_CUR_NUM_ACT " << cache->num_ACT << std::endl;
+    // cout << "LLC_RH_TOT_NUM_MIT " << cache->s_num_mits << std::endl;
+    // cout << "LLC_RH_AVG_NUM_MIT " << avg_num_mits << std::endl;
+    // cout << "LLC_RH_CUR_NUM_MIT " << cache->num_mits << std::endl;
+    // cout << "LLC_RH_MM_SET_EVICTS " << cache->s_mm_set_evicts << std::endl;
+    // cout << "LLC_RH_MM_SET_MISSES " << cache->s_mm_set_misses << std::endl;
+    // cout << std::endl;
+    // for (int i = 0; i < 100; i++) {
+    //   cout << "LLC_RH_TOT_ROW_ACT_HIST_" << i*10+1 << " " << cache->s_row_ACT[i] << std::endl;
+    // }
+    // cout << std::endl;
+    // if (cache->s_resets > 0) {
+    //   for (int i = 0; i < 100; i++) {
+    //     cout << "LLC_RH_AVG_ROW_ACT_HIST_" << i*10+1 << " " 
+    //           << (cache->s_row_ACT[i] - cache->row_ACT[i])/(cache->s_resets) << std::endl;
+    //   }
+    // }
+    // cout << std::endl;
+    // for (int i = 0; i < 100; i++) {
+    //   cout << "LLC_RH_CUR_ROW_ACT_HIST_" << i*10+1 << " " << cache->row_ACT[i] << std::endl;
+    // }
+    // cout << std::endl;
+    // cout << "LLC_EARLY_WRITEBACKS " << cache->s_early_writebacks << std::endl;
+    // cout << "LLC_CTR_WAY_DATA_WB " << cache->s_ctr_way_data_wb << std::endl;
+    // cout << "VMEM_PROC_PPAGES " << vmem.s_proc_ppages_used << std::endl;
+    // cout << "VMEM_PT_PPAGES " << vmem.s_pt_ppages_used << std::endl;
+    // cout << "DRAM_PPAGES_TOUCHED " 
+    //      << std::count(DRAM.procPageAccess, DRAM.procPageAccess + DRAM.numPPages, true) << std::endl;
+    // cout << "DRAM_ACTS_OCC " << DRAM.ACTs.size() << std::endl;
+    // cout << "DRAM_RHACTIONS_OCC " << DRAM.rhActions.size() << std::endl;
+    // cout << std::endl << std::endl;
+    // cout << "RH_BH_NUM_DELAY " << cache->s_BH_num_delay << std::endl;
+    // cout << "RH_BH_SUM_DEAY " << cache->s_BH_sum_delay << std::endl;
+    // cout << "RH_BH_MAX_DELAY " << cache->s_BH_max_delay << std::endl;
+    // cout << "RH_MG_ID_RP_ACTS " << cache->s_mg_id_rp_acts << std::endl;
+    // cout << "RH_MG_IP_RP_ACTS " << cache->s_mg_ip_rp_acts << std::endl;
+    // cout << "RH_MG_ACTS " << cache->s_mg_acts << std::endl;
+    // cout << "RH_MG_MITS " << cache->s_mg_mits << std::endl;
+    // cout << "RH_PARA_ACTS " << cache->s_para_acts << std::endl;
+    // cout << "RH_PARA_MITS " << cache->s_para_mits << std::endl;
+    // cout << "RH_PARA_NUM_EACTS " << cache->s_para_num_eacts << std::endl;
+    // cout << "RH_PARA_SUM_EACTS " << cache->s_para_sum_eacts << std::endl;
+    // if (HYDRA_ENABLE || GRAPHENE_ENABLE)
+    //   cache->lower_level->detector->print_stats();
   }
+}
+
+void print_latency_counters(uint32_t cpu, CACHE* cache)
+{
+  int bin, bin_latency_start, bin_latency_end, last_bin_start, total;
+
+  cout << cache->NAME << " EARLY / LATE PREFETCH LATENCIES" << endl;
+  for (bin = 0; bin < NUM_LATENCY_BINS; bin++) {
+    bin_latency_start = bin * LATENCY_BIN_WIDTH;
+    bin_latency_end = bin_latency_start + LATENCY_BIN_WIDTH - 1;
+    cout << "[ " << setw(5) << bin_latency_start << " - " << setw(5) << bin_latency_end << " ] " 
+         << setw(10) << cache->pf_early_latency_counter[cpu][bin] 
+         << setw(10) << cache->pf_late_latency_counter[cpu][bin] << endl;
+  }
+  
+  last_bin_start = NUM_LATENCY_BINS * LATENCY_BIN_WIDTH;
+  cout << "[ " << setw(5) << last_bin_start << " - ] " 
+       << setw(10) << cache->pf_early_latency_counter[cpu][NUM_LATENCY_BINS] 
+       << setw(10) << cache->pf_late_latency_counter[cpu][NUM_LATENCY_BINS] << endl;
 }
 
 void print_sim_stats(uint32_t cpu, CACHE* cache)
@@ -249,6 +270,10 @@ void print_sim_stats(uint32_t cpu, CACHE* cache)
     cout << cache->NAME;
     cout << " WRITEBACK ACCESS: " << setw(10) << cache->sim_access[cpu][3] << "  HIT: " << setw(10) << cache->sim_hit[cpu][3] << "  MISS: " << setw(10)
          << cache->sim_miss[cpu][3] << endl;
+
+    if (cache->NAME.find("TLB") == std::string::npos) {
+      print_latency_counters(cpu, cache);
+    }
   }
 }
 
@@ -342,6 +367,16 @@ void reset_cache_stats(uint32_t cpu, CACHE* cache)
   cache->pf_requested = 0;
   cache->pf_issued = 0;
   cache->pf_useful = 0;
+  cache->pf_useful_early = 0;
+  cache->pf_useful_late = 0;
+
+  for (uint32_t i = 0; i < NUM_CPUS; i++) {
+    for (uint32_t j = 0; j < NUM_LATENCY_BINS+1; j++) {
+      cache->pf_early_latency_counter[i][j] = 0;
+      cache->pf_late_latency_counter[i][j] = 0;
+    }
+  }
+
   cache->pf_useless = 0;
   cache->pf_fill = 0;
 
@@ -633,7 +668,7 @@ int main(int argc, char** argv)
 // #ifndef CRC2_COMPILE
   // print_dram_stats();
   DRAM.PrintStats();
-  print_branch_stats();
+  // print_branch_stats();
 // #endif
 
   return 0;

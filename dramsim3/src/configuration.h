@@ -152,9 +152,14 @@ class Config {
     int output_level;
     std::string output_dir;
     std::string output_prefix;
+    std::string output_prefix_name;
     std::string json_stats_name;
     std::string json_epoch_name;
     std::string txt_stats_name;
+
+    // Redirects json_stats_name/txt_stats_name into a new directory at
+    // runtime, e.g. to snapshot stats into a fresh directory every heartbeat.
+    void SetStatsOutputDir(const std::string &new_output_dir);
 
     // Computed parameters
     int request_size_bytes;

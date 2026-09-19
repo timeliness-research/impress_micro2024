@@ -15,7 +15,7 @@ cd ../../champsim
 make -j8
 cd bin/timeliness/prefetch
 
-./inldnl_nl_no --simulation_instruction=100000000000 \
+./inldnl_nl_no --simulation_instruction=2000000 \
 --warmup_instructions=1000000 \
 --traces $TRACE | tee test_output.txt
 

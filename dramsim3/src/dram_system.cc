@@ -50,15 +50,7 @@ void BaseDRAMSystem::PrintEpochStats() {
     return;
 }
 
-void BaseDRAMSystem::PrintStats() {
-    // Finish epoch output, remove last comma and append ]
-    std::ofstream epoch_out(config_.json_epoch_name, std::ios_base::in |
-                                                         std::ios_base::out |
-                                                         std::ios_base::ate);
-    epoch_out.seekp(-2, std::ios_base::cur);
-    epoch_out.write("]", 1);
-    epoch_out.close();
-
+void BaseDRAMSystem::WriteFinalStatsToFile() {
     std::ofstream json_out(config_.json_stats_name, std::ofstream::out);
     json_out << "{";
 
@@ -73,10 +65,27 @@ void BaseDRAMSystem::PrintStats() {
     }
     json_out.open(config_.json_stats_name, std::ofstream::app);
     json_out << "}";
+}
+
+void BaseDRAMSystem::PrintStats() {
+    // Finish epoch output, remove last comma and append ]
+    std::ofstream epoch_out(config_.json_epoch_name, std::ios_base::in |
+                                                         std::ios_base::out |
+                                                         std::ios_base::ate);
+    epoch_out.seekp(-2, std::ios_base::cur);
+    epoch_out.write("]", 1);
+    epoch_out.close();
+
+    WriteFinalStatsToFile();
 
 #ifdef THERMAL
     thermal_calc_.PrintFinalPT(clk_);
 #endif  // THERMAL
+}
+
+void BaseDRAMSystem::DumpFinalStats(const std::string &output_dir) {
+    config_.SetStatsOutputDir(output_dir);
+    WriteFinalStatsToFile();
 }
 
 void BaseDRAMSystem::ResetStats() {

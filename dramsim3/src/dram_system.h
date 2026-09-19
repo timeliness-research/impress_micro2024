@@ -34,6 +34,10 @@ class BaseDRAMSystem {
     void PrintEpochStats();
     void PrintStats();
     void ResetStats();
+    // Writes the current cumulative stats (json + txt) into output_dir,
+    // without touching the periodic epoch-stats file. Safe to call
+    // repeatedly mid-simulation (e.g. once per heartbeat).
+    void DumpFinalStats(const std::string &output_dir);
 
     virtual bool WillAcceptTransaction(uint64_t hex_addr,
                                        bool is_write) const = 0;
@@ -55,6 +59,10 @@ class BaseDRAMSystem {
     Timing timing_;
     uint64_t parallel_cycles_;
     uint64_t serial_cycles_;
+
+    // Shared by PrintStats() and DumpFinalStats(): writes each channel's
+    // final stats (json + txt, per config_.json/txt_stats_name) to disk.
+    void WriteFinalStatsToFile();
 
 #ifdef THERMAL
     ThermalCalculator thermal_calc_;

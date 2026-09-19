@@ -192,12 +192,25 @@ void Config::InitOtherParams() {
     } else {
         output_dir = output_dir + "/";
     }
-    output_prefix =
-        output_dir + reader.Get("other", "output_prefix", "dramsim3");
+    output_prefix_name = reader.Get("other", "output_prefix", "dramsim3");
+    output_prefix = output_dir + output_prefix_name;
     json_stats_name = output_prefix + ".json";
     json_epoch_name = output_prefix + "epoch.json";
     txt_stats_name = output_prefix + ".txt";
     return;
+}
+
+// Lets a caller redirect where the final (summary) stats get written at
+// runtime, e.g. into a fresh directory once per heartbeat. Deliberately
+// leaves json_epoch_name untouched so the periodic epoch-stats file (which
+// is opened/appended independently of this call) is not fragmented.
+void Config::SetStatsOutputDir(const std::string &new_output_dir) {
+    output_dir = new_output_dir;
+    if (!output_dir.empty() && output_dir.back() != '/')
+        output_dir += "/";
+    output_prefix = output_dir + output_prefix_name;
+    json_stats_name = output_prefix + ".json";
+    txt_stats_name = output_prefix + ".txt";
 }
 
 void Config::InitPowerParams() {

@@ -29,6 +29,7 @@
 #include "champsim_constants.h"
 // #include "dram_controller.h"
 #include "dramsim3_wrapper.hpp"
+#include "logging.h"
 #include "ooo_cpu.h"
 #include "operable.h"
 #include "tracereader.h"
@@ -54,6 +55,13 @@ extern std::array<CACHE*, NUM_CACHES> caches;
 extern std::array<champsim::operable*, NUM_OPERABLES> operables;
 
 std::vector<tracereader*> traces;
+
+// Root directory for this run's structured logs (created next to the
+// executable); populated once at the start of main().
+std::string run_log_dir;
+// Per-CPU heartbeat log counter, used to number each CPU's own
+// "cpu<i>_heartbeat_<N>" log directories independently.
+uint64_t heartbeat_log_count[NUM_CPUS] = {};
 
 uint64_t champsim::deprecated_clock_cycle::operator[](std::size_t cpu_idx)
 {
@@ -293,6 +301,136 @@ void print_branch_stats()
     cout << "BRANCH_DIRECT_CALL: " << (1000.0 * ooo_cpu[i]->branch_type_misses[4] / (ooo_cpu[i]->num_retired - ooo_cpu[i]->begin_sim_instr)) << endl;
     cout << "BRANCH_INDIRECT_CALL: " << (1000.0 * ooo_cpu[i]->branch_type_misses[5] / (ooo_cpu[i]->num_retired - ooo_cpu[i]->begin_sim_instr)) << endl;
     cout << "BRANCH_RETURN: " << (1000.0 * ooo_cpu[i]->branch_type_misses[6] / (ooo_cpu[i]->num_retired - ooo_cpu[i]->begin_sim_instr)) << endl << endl;
+  }
+}
+
+void write_cache_stats_json(JsonWriter& jw, uint32_t cpu, CACHE* cache, bool roi)
+{
+  const auto& access = roi ? cache->roi_access : cache->sim_access;
+  const auto& hit = roi ? cache->roi_hit : cache->sim_hit;
+  const auto& miss = roi ? cache->roi_miss : cache->sim_miss;
+
+  uint64_t total_access = 0, total_hit = 0, total_miss = 0;
+  for (uint32_t i = 0; i < NUM_TYPES; i++) {
+    total_access += access[cpu][i];
+    total_hit += hit[cpu][i];
+    total_miss += miss[cpu][i];
+  }
+
+  jw.begin_object(cache->NAME);
+  jw.field("access_total", total_access);
+  jw.field("hit_total", total_hit);
+  jw.field("miss_total", total_miss);
+  jw.field("load_access", access[cpu][LOAD]);
+  jw.field("load_hit", hit[cpu][LOAD]);
+  jw.field("load_miss", miss[cpu][LOAD]);
+  jw.field("rfo_access", access[cpu][RFO]);
+  jw.field("rfo_hit", hit[cpu][RFO]);
+  jw.field("rfo_miss", miss[cpu][RFO]);
+  jw.field("prefetch_access", access[cpu][PREFETCH]);
+  jw.field("prefetch_hit", hit[cpu][PREFETCH]);
+  jw.field("prefetch_miss", miss[cpu][PREFETCH]);
+  jw.field("writeback_access", access[cpu][WRITEBACK]);
+  jw.field("writeback_hit", hit[cpu][WRITEBACK]);
+  jw.field("writeback_miss", miss[cpu][WRITEBACK]);
+
+  jw.field("pf_requested", cache->pf_requested);
+  jw.field("pf_issued", cache->pf_issued);
+  jw.field("pf_useful", cache->pf_useful);
+  jw.field("pf_useless", cache->pf_useless);
+  jw.field("pf_useful_early", cache->pf_useful_early);
+  jw.field("pf_useful_late", cache->pf_useful_late);
+
+  // TLBs don't track prefetch latency, so skip the histogram for them.
+  if (cache->NAME.find("TLB") == std::string::npos) {
+    jw.field("latency_bin_width", (uint64_t)LATENCY_BIN_WIDTH);
+    jw.field("num_latency_bins", (uint64_t)NUM_LATENCY_BINS);
+    jw.array_field("pf_early_latency_histogram", cache->pf_early_latency_counter[cpu], NUM_LATENCY_BINS + 1);
+    jw.array_field("pf_late_latency_histogram", cache->pf_late_latency_counter[cpu], NUM_LATENCY_BINS + 1);
+  }
+
+  jw.end_object();
+}
+
+// Dumps the build-time configuration (cores, caches, DRAM geometry) used by
+// this run into "<run_log_dir>/config.json".
+void write_config_log()
+{
+  JsonWriter jw(run_log_dir + "/config.json");
+
+  jw.field("num_cpus", (uint64_t)NUM_CPUS);
+  jw.field("warmup_instructions", warmup_instructions);
+  jw.field("simulation_instructions", simulation_instructions);
+  jw.field("heartbeat_frequency", (uint64_t)STAT_PRINTING_PERIOD);
+  jw.field("block_size", (uint64_t)BLOCK_SIZE);
+  jw.field("page_size", (uint64_t)PAGE_SIZE);
+
+  jw.begin_object("dram");
+  jw.field("channels", (uint64_t)DRAM_CHANNELS);
+  jw.field("ranks", (uint64_t)DRAM_RANKS);
+  jw.field("banks", (uint64_t)DRAM_BANKS);
+  jw.field("rows", (uint64_t)DRAM_ROWS);
+  jw.field("columns", (uint64_t)DRAM_COLUMNS);
+  jw.end_object();
+
+  jw.begin_object("caches");
+  for (auto it = caches.rbegin(); it != caches.rend(); ++it) {
+    CACHE* cache = *it;
+    jw.begin_object(cache->NAME);
+    jw.field("sets", cache->NUM_SET);
+    jw.field("ways", cache->NUM_WAY);
+    jw.field("rq_size", cache->RQ_SIZE);
+    jw.field("wq_size", cache->WQ_SIZE);
+    jw.field("pq_size", cache->PQ_SIZE);
+    jw.field("mshr_size", cache->MSHR_SIZE);
+    jw.field("hit_latency", cache->HIT_LATENCY);
+    jw.field("fill_latency", cache->FILL_LATENCY);
+    jw.end_object();
+  }
+  jw.end_object();
+}
+
+// Snapshots CPU `cpu`'s cumulative (since-warmup) stats into
+// "<hb_dir>/sim_stats.json". Called once per that CPU's heartbeat.
+void write_heartbeat_stats_log(const std::string& hb_dir, uint64_t heartbeat_index, uint32_t cpu, float heartbeat_ipc, float cumulative_ipc,
+                                uint64_t elapsed_hour, uint64_t elapsed_minute, uint64_t elapsed_second)
+{
+  JsonWriter jw(hb_dir + "/sim_stats.json");
+
+  jw.field("heartbeat_index", heartbeat_index);
+  jw.field("cpu", cpu);
+  jw.field("instructions_retired", ooo_cpu[cpu]->num_retired);
+  jw.field("current_cycle", ooo_cpu[cpu]->current_cycle);
+  jw.field("heartbeat_ipc", heartbeat_ipc);
+  jw.field("cumulative_ipc", cumulative_ipc);
+  jw.field("elapsed_hour", elapsed_hour);
+  jw.field("elapsed_minute", elapsed_minute);
+  jw.field("elapsed_second", elapsed_second);
+
+  jw.begin_object("caches");
+  for (auto it = caches.rbegin(); it != caches.rend(); ++it)
+    write_cache_stats_json(jw, cpu, *it, /*roi=*/false);
+  jw.end_object();
+}
+
+// Dumps final (region-of-interest) stats for every CPU into
+// "<run_log_dir>/final_stats.json".
+void write_final_stats_log()
+{
+  JsonWriter jw(run_log_dir + "/final_stats.json");
+
+  for (uint32_t i = 0; i < NUM_CPUS; i++) {
+    jw.begin_object("cpu" + std::to_string(i));
+    jw.field("instructions", ooo_cpu[i]->finish_sim_instr);
+    jw.field("cycles", ooo_cpu[i]->finish_sim_cycle);
+    jw.field("ipc", (float)ooo_cpu[i]->finish_sim_instr / ooo_cpu[i]->finish_sim_cycle);
+
+    jw.begin_object("caches");
+    for (auto it = caches.rbegin(); it != caches.rend(); ++it)
+      write_cache_stats_json(jw, i, *it, /*roi=*/true);
+    jw.end_object();
+
+    jw.end_object();
   }
 }
 
@@ -555,6 +693,10 @@ int main(int argc, char** argv)
     (*it)->impl_replacement_initialize();
   }
 
+  run_log_dir = create_run_log_dir(argv[0]);
+  std::cout << "Logging to: " << run_log_dir << std::endl;
+  write_config_log();
+
   // simulation entry point
   while (std::any_of(std::begin(simulation_complete), std::end(simulation_complete), std::logical_not<uint8_t>())) {
 
@@ -586,7 +728,7 @@ int main(int argc, char** argv)
       }
 
       // heartbeat information
-      if (show_heartbeat && (ooo_cpu[i]->num_retired >= ooo_cpu[i]->next_print_instruction)) {
+      if (ooo_cpu[i]->num_retired >= ooo_cpu[i]->next_print_instruction) {
         float cumulative_ipc;
         if (warmup_complete[i])
           cumulative_ipc = (1.0 * (ooo_cpu[i]->num_retired - ooo_cpu[i]->begin_sim_instr)) / (ooo_cpu[i]->current_cycle - ooo_cpu[i]->begin_sim_cycle);
@@ -594,10 +736,20 @@ int main(int argc, char** argv)
           cumulative_ipc = (1.0 * ooo_cpu[i]->num_retired) / ooo_cpu[i]->current_cycle;
         float heartbeat_ipc = (1.0 * ooo_cpu[i]->num_retired - ooo_cpu[i]->last_sim_instr) / (ooo_cpu[i]->current_cycle - ooo_cpu[i]->last_sim_cycle);
 
-        cout << "Heartbeat CPU " << i << " instructions: " << ooo_cpu[i]->num_retired << " cycles: " << ooo_cpu[i]->current_cycle;
-        cout << " heartbeat IPC: " << heartbeat_ipc << " cumulative IPC: " << cumulative_ipc;
-        cout << " (Simulation time: " << elapsed_hour << " hr " << elapsed_minute << " min " << elapsed_second << " sec) ";
-        cout << endl;
+        if (show_heartbeat) {
+          cout << "Heartbeat CPU " << i << " instructions: " << ooo_cpu[i]->num_retired << " cycles: " << ooo_cpu[i]->current_cycle;
+          cout << " heartbeat IPC: " << heartbeat_ipc << " cumulative IPC: " << cumulative_ipc;
+          cout << " (Simulation time: " << elapsed_hour << " hr " << elapsed_minute << " min " << elapsed_second << " sec) ";
+          cout << endl;
+        }
+
+        // Structured per-heartbeat logs: one fresh sub-directory per CPU per
+        // heartbeat, containing this cpu's cumulative sim stats and a
+        // DRAMSim3 stats dump.
+        std::string hb_dir = create_heartbeat_log_dir(run_log_dir, i, ++heartbeat_log_count[i]);
+        write_heartbeat_stats_log(hb_dir, heartbeat_log_count[i], i, heartbeat_ipc, cumulative_ipc, elapsed_hour, elapsed_minute, elapsed_second);
+        DRAM.DumpStats(hb_dir);
+
         ooo_cpu[i]->next_print_instruction += STAT_PRINTING_PERIOD;
 
         ooo_cpu[i]->last_sim_instr = ooo_cpu[i]->num_retired;
@@ -665,9 +817,11 @@ int main(int argc, char** argv)
   for (auto it = caches.rbegin(); it != caches.rend(); ++it)
     (*it)->impl_replacement_final_stats();
 
+  write_final_stats_log();
+
 // #ifndef CRC2_COMPILE
   // print_dram_stats();
-  DRAM.PrintStats();
+  DRAM.DumpStats(run_log_dir);
   // print_branch_stats();
 // #endif
 

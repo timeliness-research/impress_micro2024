@@ -308,6 +308,9 @@ public:
         //DEBUG std::cout << "[ACT] Ch-" << ch << " Ra-" << ra << " Ba-" << ba << " Ro-" << ro << std::endl;
     }
     void PrintStats() { memory_system_->PrintStats(); }
+    // Writes current cumulative DRAM stats (json + txt) into output_dir.
+    // Safe to call repeatedly mid-simulation (e.g. once per heartbeat).
+    void DumpStats(const std::string& output_dir) { memory_system_->DumpStats(output_dir); }
 protected:
     dramsim3::MemorySystem* memory_system_;
     std::vector<PACKET> RQ{DRAM_RQ_SIZE*DRAM_CHANNELS}; // Meta-RQ for callbacks

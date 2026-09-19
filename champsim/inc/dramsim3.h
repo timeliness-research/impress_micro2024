@@ -29,6 +29,9 @@ class MemorySystem {
     int GetQueueSize() const;
     void PrintStats() const;
     void ResetStats();
+    // Writes current cumulative stats into output_dir. Safe to call
+    // repeatedly mid-simulation (e.g. once per heartbeat).
+    void DumpStats(const std::string &output_dir);
 
     bool WillAcceptTransaction(uint64_t hex_addr, bool is_write) const;
     bool AddTransaction(uint64_t hex_addr, bool is_write, bool isRHMit);

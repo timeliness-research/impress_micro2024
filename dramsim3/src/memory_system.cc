@@ -65,6 +65,10 @@ void MemorySystem::PrintStats() const { dram_system_->PrintStats(); }
 
 void MemorySystem::ResetStats() { dram_system_->ResetStats(); }
 
+void MemorySystem::DumpStats(const std::string &output_dir) {
+    dram_system_->DumpFinalStats(output_dir);
+}
+
 MemorySystem* GetMemorySystem(const std::string &config_file, const std::string &output_dir,
                  std::function<void(uint64_t)> read_callback,
                  std::function<void(uint64_t)> write_callback) {

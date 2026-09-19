@@ -2,7 +2,7 @@
     "executable_name": "bin/timeliness/prefetch/inldnl_nl_no",
     "block_size": 64,
     "page_size": 4096,
-    "heartbeat_frequency": 10000000,
+    "heartbeat_frequency": 1000000,
     "num_cores": 4,
     "core_scaling": 12,
     "MOP_GANG_SIZE": 0,
